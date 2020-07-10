@@ -8,7 +8,7 @@ import os
 import math
 from DeepPyCar import *
 
-video = 'video/IMG_1548.mov'
+video = 'video/IMG_1540.mov'
 
 cap = cv2.VideoCapture(video)
 if not cap.isOpened():
@@ -21,8 +21,9 @@ pixel = (20,60,80)
 lower = upper = None
 height, width = 480, 640
 
-k = 0.85
+k = 0.85  # higher k - smoothier control
 low_pass = width/2
+collect = 1
 pause=False
 
 def pick_color():
@@ -72,13 +73,17 @@ while True:
     edges_cropped = cv2.bitwise_and(edges, mask_edges)
 
     contours, h = cv2.findContours(edges_cropped, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contours.sort(key=lambda x: cv2.arcLength(x, True), reverse=True)
+    contours.sort(key=lambda x: cv2.arcLength(x, False), reverse=True)
     #cv2.drawContours(image, contours, -1, (255, 0, 0), 3, cv2.LINE_AA, h, 1)
     center = 0
-    for cnt in [contours[0], contours[1]]:
+    n = 0
+    for cnt in contours:
         if cv2.arcLength(cnt, False) < 300:
             continue
-        cnt = cv2.approxPolyDP(cnt, 0.001 * cv2.arcLength(cnt, True), True)
+        n += 1
+        if n > 2:
+            break
+        cnt = cv2.approxPolyDP(cnt, 0.001 * cv2.arcLength(cnt, False), True)
         #cv2.drawContours(image, [cnt], -1, (0, 0, 255), 3)
         [vx,vy,x,y] = cv2.fitLine(cnt, cv2.DIST_L2,0,0.01,0.01)
         x1 = int((-y*vx/vy)+x)
@@ -89,7 +94,12 @@ while True:
         x = int((x2-x1)*(y-y1)/(y2-y1)+x1)
         cv2.line(image,(x,y),(x2,y2),(0,255,0),2)
         center += x
-    center /= 2
+    if n >= 2:
+        center /= 2
+        collect = 1
+    else:
+        collect += 1
+        center = width/2 + math.copysign(collect, x-x2)
     low_pass = (1-k)*center + k*low_pass
     cv2.line(image,(int(width/2),height-1),(int(low_pass),int(height/2)),(0,0,255),2)
 
